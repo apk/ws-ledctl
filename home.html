@@ -1,41 +1,77 @@
 <html>
 <head>
-<title>Chat Example</title>
+<title>Campi Leds</title>
 <script type="text/javascript" src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js"></script>
 <script type="text/javascript">
-    $(function() {
     var conn;
-    var msg = $("#msg");
-    var log = $("#log");
-    function appendLog(msg) {
-        var d = log[0]
-        var doScroll = d.scrollTop == d.scrollHeight - d.clientHeight;
-        msg.appendTo(log)
-        if (doScroll) {
-            d.scrollTop = d.scrollHeight - d.clientHeight;
-        }
-    }
-    $("#form").submit(function() {
+    var d_green = $("#green");
+    var d_red = $("#red");
+    var d_door = $("#door");
+    var d_light = $("#light");
+    var d_table = $("#table");
+    var d_error = $("#error");
+    var d_stat = $("#stat");
+    function togg(x) {
+        console.log("togg:"+x);
+        var st = x.style;
+        var c = st.backgroundColor;
+        st.backgroundColor='gray';
+        var o = {};
+        o[x.id]=c;
         if (!conn) {
             return false;
         }
-        if (!msg.val()) {
-            return false;
-        }
-        conn.send(msg.val());
-        msg.val("");
-        return false
-    });
+        //conn.send(JSON.stringify(o));
+        conn.send(x.id);
+        return false;
+    };
+    function tick() {
+        window.setTimeout(tick,500000);
+        conn.send("#");
+    }
+    $(function() {
+    d_green = $("#green");
+    d_red = $("#red");
+    d_door = $("#door");
+    d_light = $("#light");
+    d_table = $("#table");
+    d_error = $("#error");
+    d_stat = $("#stat");
     if (window["WebSocket"]) {
         conn = new WebSocket("ws://{{$}}/go/ws");
+        d_stat.html("Connection tried.");
         conn.onclose = function(evt) {
-            appendLog($("<div><b>Connection closed.</b></div>"))
+            d_stat.html("Connection closed.");
         }
         conn.onmessage = function(evt) {
-            appendLog($("<div/>").text(evt.data))
+            var v = false;
+            console.log("E:"+evt.data);
+            var str = evt.data;
+            for (var i = 0; i < str.length; i ++) {
+	        var c = str[i];
+		if (c == '0') {
+		    v = false;
+		} else if (c == '1') {
+		    v = true;
+		} else if (c == 'r') {
+		    d_red.css('background-color', v ? 'red' : '#ffeeee');
+		} else if (c == 'g') {
+		    d_green.css('background-color', v ? 'green' : '#eeffee');
+		} else if (c == 'd') {
+		    d_door.css('background-color', v ? 'gray' : 'white');
+		} else if (c == 'l') {
+		    d_light.css('background-color', v ? 'gray' : 'white');
+		} else if (c == 't') {
+		    d_table.css('background-color', v ? 'gray' : 'white');
+		} else if (c == 'e') {
+		    d_error.css('background-color', v ? 'gray' : 'white');
+		}
+	    }
+            d_stat.text(evt.data);
         }
+        window.setTimeout(tick,1000);
     } else {
-        appendLog($("<div><b>Your browser does not support WebSockets.</b></div>"))
+        d_stat.html("Your browser does not support WebSockets. Sorry.");
     }
     });
 </script>
@@ -49,35 +85,28 @@ body {
     margin: 0;
     width: 100%;
     height: 100%;
-    background: gray;
-}
-#log {
     background: white;
-    margin: 0;
-    padding: 0.5em 0.5em 0.5em 0.5em;
-    position: absolute;
-    top: 0.5em;
-    left: 0.5em;
-    right: 0.5em;
-    bottom: 3em;
-    overflow: auto;
 }
-#form {
-    padding: 0 0.5em 0 0.5em;
-    margin: 0;
-    position: absolute;
-    bottom: 1em;
-    left: 0px;
-    width: 100%;
-    overflow: hidden;
+.but {
+   margin: 1em;
+   height: 2.5em;
+   max-width: 12em;
+   border: 1px solid black;
+   border-radius: 1em;
 }
 </style>
 </head>
 <body>
-<div id="log"></div>
-<form id="form">
-    <input type="submit" value="Send" />
-    <input type="text" id="msg" size="64"/>
-</form>
+<table style='width: 100%; height: 70%; '>
+<tr>
+<td align='center' valign='center'>
+<div id='green' class='but' onclick="togg(this);", style='background-color: lightgreen;' >Green</div>
+<div id='red' class='but' onclick="togg(this);", style='background-color: lightred;'>Red</div>
+<div id='door' class='but' onclick="togg(this);", style='background-color: yellow;'>Door</div>
+<div id='light' class='but' onclick="togg(this);", style='background-color: yellow;'>Light</div>
+<div id='table' class='but' onclick="togg(this);", style='background-color: yellow;'>Table</div>
+<div id='error' class='but' onclick="togg(this);", style='background-color: yellow;'>Error</div>
+<div id='stat' >State</div>
+</td></tr></table>
 </body>
 </html>

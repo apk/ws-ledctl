@@ -77,12 +77,15 @@ func (h *hub) run() {
 					d ^= 0x1000
 				case 'l':
 					d ^= 0x2000
+				case 'e':
+					d ^= 0x8000
 				}
 			}
-			m = []byte(fmt.Sprintf("%dr%dg%dd%dt%dl", r, g,
+			m = []byte(fmt.Sprintf("%dr%dg%dd%dt%dl%de", r, g,
 				onezero(d & 0x4000),
 				onezero(d & 0x1000),
-				onezero(d & 0x2000)))
+				onezero(d & 0x2000),
+				onezero(d & 0x8000)))
 			fmt.Printf("M: %s\n", m)
 			for c := range h.connections {
 				select {
