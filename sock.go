@@ -8,10 +8,8 @@ import (
 	"io/ioutil"
 	"fmt"
 	"github.com/gorilla/websocket"
-	"go/build"
 	"log"
 	"net/http"
-	"path/filepath"
 	"text/template"
 
 	"iow"
@@ -158,50 +156,61 @@ func (wsh wsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 var (
 	addr      = flag.String("addr", ":8080", "http service address")
-	assets    = flag.String("assets", defaultAssetPath(), "path to assets")
+	pic       = flag.Bool("pic", false, "pic-only mode")
 	homeTempl *template.Template
 )
-
-func defaultAssetPath() string {
-	p, err := build.Default.Import("gary.burd.info/go-websocket-chat", "", build.FindOnly)
-	if err != nil {
-		return "."
-	}
-	return p.Dir
-}
 
 func homeHandler(c http.ResponseWriter, req *http.Request) {
 	homeTempl.Execute(c, req.Host)
 }
 
-func picserve(ch chan chan []byte) {
+type picreq struct {
+	ch chan []byte
+	size int
+}
+
+func to_s(x int) string {
+	return fmt.Sprintf("%d", x)
+}
+
+func picserve(ch chan picreq) {
 	for rq := range ch {
-		cmd := exec.Command("raspistill", "-t", "5", "-mm", "matrix", "-o", "-")
+		cmd := exec.Command(
+			"raspistill",
+			"-t", "5",
+			"-w", to_s (9 * 4 * rq.size),
+			"-h", to_s (9 * 3 * rq.size),
+			"-mm", "matrix",
+			"-o", "-")
 		out, err := cmd.Output()
 		if err != nil {
 			log.Print("Exec:", err)
 		}
-		rq <- out
+		rq.ch <- out
 	}
 }
 
 func main() {
 	flag.Parse()
-	homeTempl = template.Must(template.ParseFiles(filepath.Join(*assets, "home.html")))
-	h := newHub()
-	go h.run()
 
-	http.HandleFunc("/go/", homeHandler)
-	http.Handle("/go/ws", wsHandler{h: h})
+	if (!*pic) {
+		homeTempl = template.Must(template.ParseFiles("home.html"))
+		http.HandleFunc("/go/", homeHandler)
 
-	http.HandleFunc("/go/set", func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
-		if err == nil {
-			h.broadcast <- body
-		}
-	})
+		h := newHub()
+		go h.run()
 
-	ch := make(chan chan []byte)
+		http.Handle("/go/ws", wsHandler{h: h})
+
+		http.HandleFunc("/go/set", func(w http.ResponseWriter, r *http.Request) {
+			body, err := ioutil.ReadAll(r.Body)
+			if err == nil {
+				h.broadcast <- body
+			}
+		})
+	}
+
+	ch := make(chan picreq)
 
 	go picserve(ch)
 
@@ -209,11 +218,29 @@ func main() {
 		_, err := ioutil.ReadAll(r.Body)
 		if err == nil {
 			rc := make(chan []byte)
-			ch <- rc
+			ch <- picreq{ch: rc, size: 8}
 			s := <-rc
 			w.Write([]byte(s))
 		}
 	})
+
+	defhdlr := func (suf string, fac int) {
+		http.HandleFunc("/go/pic" + suf, func(w http.ResponseWriter, r *http.Request) {
+			_, err := ioutil.ReadAll(r.Body)
+			if err == nil {
+				rc := make(chan []byte)
+				ch <- picreq{ch: rc, size: fac}
+				s := <-rc
+				w.Write([]byte(s))
+			}
+		})
+	}
+
+	defhdlr ("/r", 4 * 9);
+	defhdlr ("/s", 2 * 9);
+	defhdlr ("/t", 15);
+	defhdlr ("/u", 9);
+	defhdlr ("/v", 5);
 
 	if err := http.ListenAndServe(*addr, nil); err != nil {
 		log.Fatal("ListenAndServe:", err)
