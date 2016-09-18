@@ -214,16 +214,6 @@ func main() {
 
 	go picserve(ch)
 
-	http.HandleFunc("/go/pic", func(w http.ResponseWriter, r *http.Request) {
-		_, err := ioutil.ReadAll(r.Body)
-		if err == nil {
-			rc := make(chan []byte)
-			ch <- picreq{ch: rc, size: 8}
-			s := <-rc
-			w.Write([]byte(s))
-		}
-	})
-
 	defhdlr := func (suf string, fac int) {
 		http.HandleFunc("/go/pic" + suf, func(w http.ResponseWriter, r *http.Request) {
 			_, err := ioutil.ReadAll(r.Body)
@@ -236,6 +226,7 @@ func main() {
 		})
 	}
 
+	defhdlr ("", 8 * 9);
 	defhdlr ("/r", 4 * 9);
 	defhdlr ("/s", 2 * 9);
 	defhdlr ("/t", 15);
