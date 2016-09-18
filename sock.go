@@ -61,8 +61,8 @@ func (h *hub) run() {
 			}
 		case m := <-h.broadcast:
 			fmt.Printf("M: %s\n", m)
-			if len(m) > 0 {
-				switch m[0] {
+			for _,mm := range m {
+				switch mm {
 				case 'r':
 					r ^= 1
 					ioutil.WriteFile("/sys/class/gpio/gpio22/value",[]byte(fmt.Sprintf("%d", r)), 0644)
