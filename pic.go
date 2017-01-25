@@ -32,9 +32,13 @@ func main() {
 	gnord.PiCam(mux,"/pic")
 
 	if *ssladdr != "" {
-		go log.Fatal(http.ListenAndServeTLS(*ssladdr,
-			*certpref + "fullchain.pem", *certpref + "key.pem",
-			mux))
+		go func () {
+			log.Fatal(http.ListenAndServeTLS(*ssladdr,
+				*certpref + "fullchain.pem", *certpref + "key.pem",
+				mux))
+		} ()
 	}
 	log.Fatal(http.ListenAndServe(*addr, mux))
 }
+
+// sudo setcap cap_net_bind_service=+ep ./pic
