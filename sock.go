@@ -45,9 +45,21 @@ func onezero(x int) int {
 	return 1;
 }
 
+func op_set(x int, v int) int {
+	return x | v;
+}
+
+func op_clr(x int, v int) int {
+	return x & ^v;
+}
+
+func op_xor(x int, v int) int {
+	return x ^ v;
+}
+
 func (h *hub) run() {
 	var r, g int;
-	d := 0xf000
+	d := 0x0000
 	od := 0
 	w := iow.Open()
 	for {
@@ -61,22 +73,29 @@ func (h *hub) run() {
 			}
 		case m := <-h.broadcast:
 			fmt.Printf("M: %s\n", m)
-			if len(m) > 0 {
-				switch m[0] {
+			op := op_xor
+			for _,mm := range m {
+				switch mm {
+				case '+':
+					op = op_set;
+				case '-':
+					op = op_clr;
+				case '/':
+					op = op_xor;
 				case 'r':
-					r ^= 1
+					r = op(r, 1)
 					ioutil.WriteFile("/sys/class/gpio/gpio22/value",[]byte(fmt.Sprintf("%d", r)), 0644)
 				case 'g':
-					g ^= 1
+					g = op(g, 1)
 					ioutil.WriteFile("/sys/class/gpio/gpio17/value",[]byte(fmt.Sprintf("%d", g)), 0644)
 				case 'd':
-					d ^= 0x4000
+					d = op(d, 0x4000)
 				case 't':
-					d ^= 0x1000
+					d = op(d, 0x1000)
 				case 'l':
-					d ^= 0x2000
+					d = op(d, 0x2000)
 				case 'e':
-					d ^= 0x8000
+					d = op(d, 0x8000)
 				}
 			}
 			m = []byte(fmt.Sprintf("%dr%dg%dd%dt%dl%de", r, g,
@@ -84,7 +103,7 @@ func (h *hub) run() {
 				onezero(d & 0x1000),
 				onezero(d & 0x2000),
 				onezero(d & 0x8000)))
-			fmt.Printf("M: %s\n", m)
+			fmt.Printf("R: %s\n", m)
 			for c := range h.connections {
 				select {
 				case c.send <- m:
@@ -96,7 +115,7 @@ func (h *hub) run() {
 		}
 		if (d != od) {
 			fmt.Printf("%d %x\n", w, d);
-			iow.Set(w, d)
+			iow.Set(w, d ^ 0xf000)
 		}
 	}
 }
@@ -214,16 +233,6 @@ func main() {
 
 	go picserve(ch)
 
-	http.HandleFunc("/go/pic", func(w http.ResponseWriter, r *http.Request) {
-		_, err := ioutil.ReadAll(r.Body)
-		if err == nil {
-			rc := make(chan []byte)
-			ch <- picreq{ch: rc, size: 8}
-			s := <-rc
-			w.Write([]byte(s))
-		}
-	})
-
 	defhdlr := func (suf string, fac int) {
 		http.HandleFunc("/go/pic" + suf, func(w http.ResponseWriter, r *http.Request) {
 			_, err := ioutil.ReadAll(r.Body)
@@ -236,6 +245,7 @@ func main() {
 		})
 	}
 
+	defhdlr ("", 8 * 9);
 	defhdlr ("/r", 4 * 9);
 	defhdlr ("/s", 2 * 9);
 	defhdlr ("/t", 15);

@@ -22,7 +22,7 @@
             return false;
         }
         //conn.send(JSON.stringify(o));
-        conn.send(x.id);
+        conn.send(x.id.substring(0,1));
         return false;
     };
     function tick() {
