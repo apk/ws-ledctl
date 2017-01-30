@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"github.com/gorilla/websocket"
 	"net/http"
+	"flag"
+	"log"
+	"path/filepath"
+	gnord "github.com/apk/httptools"
 
 	"iow"
 )
@@ -171,11 +175,28 @@ func LampHandler(mux *http.ServeMux, path string) {
 	})
 }
 
+var hidroot = flag.String("path", "", "hidden root directory")
+var hidaddr = flag.String("addr", "127.0.0.1:4040", "http service address")
+
 func main() {
 	mux := CommonSetup()
 
-	LampHandler(mux,"/lamp")
+	if *hidroot != "" {
+		hid := http.NewServeMux()
+		pth, err := filepath.Abs(*hidroot)
+		if (err != nil) {
+			fmt.Printf("filepath.Abs(%v): %v\n",*docroot,err)
+			return
+		}
 
+		hid.HandleFunc("/", gnord.GnordHandleFunc(&gnord.GnordOpts{Path: pth, IpHeader: *iphead}))
+		gnord.PiCam(hid,"/pic")
+		go func () {
+			log.Fatal(http.ListenAndServe(*hidaddr, mux))
+		} ()
+	}
+
+	LampHandler(mux,"/lamp")
 	CommonMain(mux)
 }
 
