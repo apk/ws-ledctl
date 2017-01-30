@@ -35,28 +35,11 @@ type hub struct {
 	unregister chan *connection
 }
 
-func newHub() *hub {
-	return &hub{
-		broadcast:   make(chan []byte),
-		register:    make(chan *connection),
-		unregister:  make(chan *connection),
-		connections: make(map[*connection]bool),
-	}
-}
-
 func onezero(x int) int {
 	if (x == 0) {
 		return 0;
 	}
 	return 1;
-}
-
-func op_set(x int, v int) int {
-	return x | v;
-}
-
-func op_clr(x int, v int) int {
-	return x & ^v;
 }
 
 func op_xor(x int, v int) int {
@@ -83,9 +66,13 @@ func (h *hub) run() {
 			for _,mm := range m {
 				switch mm {
 				case '+':
-					op = op_set;
+					op = func (x int, v int) int {
+						return x | v;
+					}
 				case '-':
-					op = op_clr;
+					op = func (x int, v int) int {
+						return x & ^v;
+					}
 				case '/':
 					op = op_xor;
 				case 'r':
@@ -181,11 +168,17 @@ func (wsh wsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 
 func LampHandler(mux *http.ServeMux, path string) {
-	h := newHub()
+	h := &hub{
+		broadcast:   make(chan []byte),
+		register:    make(chan *connection),
+		unregister:  make(chan *connection),
+		connections: make(map[*connection]bool),
+	}
 	go h.run()
 	mux.Handle(path, wsHandler{h: h})
 }
 
+// ================
 
 var addr = flag.String("addr", "127.0.0.1:4040", "http service address")
 var ssladdr = flag.String("tls", "", "http service address")
