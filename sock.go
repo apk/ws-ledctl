@@ -40,9 +40,9 @@ func newHub() *hub {
 
 func onezero(x int) int {
 	if (x == 0) {
-		return 0;
+		return 1;
 	}
-	return 1;
+	return 0;
 }
 
 func op_set(x int, v int) int {
@@ -59,8 +59,8 @@ func op_xor(x int, v int) int {
 
 func (h *hub) run() {
 	var r, g int;
-	d := 0x0000
-	od := 0
+	d := 0
+	od := 1
 	w := iow.Open()
 	for {
 		select {
@@ -116,6 +116,7 @@ func (h *hub) run() {
 		if (d != od) {
 			fmt.Printf("%d %x\n", w, d);
 			iow.Set(w, d ^ 0xf000)
+			od = d
 		}
 	}
 }
