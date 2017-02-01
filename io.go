@@ -29,9 +29,9 @@ type hub struct {
 
 func onezero(x int) int {
 	if (x == 0) {
-		return 0;
+		return 1;
 	}
-	return 1;
+	return 0;
 }
 
 func op_xor(x int, v int) int {
@@ -101,6 +101,7 @@ func (h *hub) run() {
 		if (d != od) {
 			fmt.Printf("%d %x\n", w, d);
 			iow.Set(w, d ^ 0xf000)
+			od = d;
 		}
 	}
 }
@@ -158,7 +159,7 @@ func (wsh wsHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	c.reader()
 }
 
-func LampHandler(mux *http.ServeMux, path string) {
+func LampHandlerStart() *hub {
 	h := &hub{
 		broadcast:   make(chan []byte),
 		register:    make(chan *connection),
@@ -166,7 +167,11 @@ func LampHandler(mux *http.ServeMux, path string) {
 		connections: make(map[*connection]bool),
 	}
 	go h.run()
-	mux.Handle(path+"/go", wsHandler{h: h})
+	return h
+}
+
+func (h *hub) Add(mux *http.ServeMux, path string) {
+	mux.Handle(path+"/ws", wsHandler{h: h})
 	mux.HandleFunc(path+"/set", func(w http.ResponseWriter, r *http.Request) {
 		body, err := ioutil.ReadAll(r.Body)
 		if err == nil {
@@ -175,12 +180,13 @@ func LampHandler(mux *http.ServeMux, path string) {
 	})
 }
 
-var hidroot = flag.String("path", "", "hidden root directory")
-var hidaddr = flag.String("addr", "127.0.0.1:4040", "http service address")
+var hidroot = flag.String("hidpath", "", "hidden root directory")
+var hidaddr = flag.String("hidaddr", "127.0.0.1:4040", "hidden service address")
 
 func main() {
 	mux := CommonSetup()
 
+	h := LampHandlerStart()
 	if *hidroot != "" {
 		hid := http.NewServeMux()
 		pth, err := filepath.Abs(*hidroot)
@@ -191,14 +197,16 @@ func main() {
 
 		hid.HandleFunc("/", gnord.GnordHandleFunc(&gnord.GnordOpts{Path: pth, IpHeader: *iphead}))
 		gnord.PiCam(hid,"/pic")
+		h.Add(hid,"/lamp")
 		go func () {
-			log.Fatal(http.ListenAndServe(*hidaddr, mux))
+			log.Fatal(http.ListenAndServe(*hidaddr, hid))
 		} ()
 	}
+	h.Add(mux,"/lamp")
 
-	LampHandler(mux,"/lamp")
 	CommonMain(mux)
 }
 
 // g build io.go common.go
-// sudo setcap cap_net_bind_service=+ep ./pic
+// sudo setcap cap_net_bind_service=+ep ../io
+// ../io --addr :80 --path plain --tls :443 --hidpath hidden --cert-prefix certs/
